@@ -32,6 +32,10 @@ class User(BaseModel):
 async def read_root():
 	return {"message": "Welcome to the TuneStats API!"}
 
+@app.head("/")
+async def read_root():
+	return {"message": "Welcome to the TuneStats API!"}
+
 
 @app.post("/addUser")
 async def addUser(newUser:User):
@@ -45,6 +49,21 @@ async def addUser(newUser:User):
 		raise HTTPException(status_code=500, detail="An error occurred.")
 
 
+def refresh_access_token(user: User):
+	url = 'https://accounts.spotify.com/api/token'
+	payload = {
+		'grant_type': 'refresh_token',
+		'refresh_token': user.refreshToken,
+		'client_id': os.getenv("SPOTIFY_CLIENT_ID"),
+		'client_secret': os.getenv("SPOTIFY_CLIENT_SECRET")
+	}
+
+	response = requests.post(url, data=payload)
+	if response.status_code == 200:
+		new_token_info = response.json()
+		new_access_token = new_token_info.get('access_token')
+		collection.update_one({"emailId": user.emailId}, {"$set": {"currentAccessToken": new_access_token}})
+
 def	checkListenTime():
 	url = 'https://api.spotify.com/v1/me/player/currently-playing'
 
@@ -56,6 +75,11 @@ def	checkListenTime():
 			}
 
 			response = requests.get(url, headers=headers)
+
+			if response.status_code == 401:
+				refresh_access_token(user)
+				headers['Authorization'] = f'Bearer {user.currentAccessToken}'
+				response = requests.get(url, headers=headers)
 
 			if response.status_code == 200:
 				data = response.json()
