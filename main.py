@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 connection_string = os.getenv("MONGODB_CONNECTION_STRING")
 client = MongoClient(connection_string)
 db = client["Users"]
