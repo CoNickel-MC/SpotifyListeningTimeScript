@@ -65,5 +65,4 @@ def	checkListenTime():
 		time.sleep(45)
 
 
-
 threading.Thread(target=checkListenTime, daemon=True).start()
