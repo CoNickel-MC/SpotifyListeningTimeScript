@@ -9,6 +9,8 @@ from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 
+
+
 load_dotenv()
 
 connection_string = os.getenv("MONGODB_CONNECTION_STRING")
