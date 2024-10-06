@@ -28,6 +28,11 @@ class User(BaseModel):
 	lastCheckTime: int
 
 
+@app.get("/")
+async def read_root():
+	return {"message": "Welcome to the TuneStats API!"}
+
+
 @app.post("/addUser")
 async def addUser(newUser:User):
 	try:
