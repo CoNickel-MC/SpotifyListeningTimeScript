@@ -27,6 +27,7 @@ class User(BaseModel):
 	listenTime: int
 	lastCheckTime: int
 
+
 @app.post("/addUser")
 async def addUser(newUser:User):
 	try:
