@@ -6,10 +6,12 @@ from fastapi import FastAPI, HTTPException
 import requests
 from pymongo import MongoClient
 from pydantic import BaseModel
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
-
-connection_string = "mongodb+srv://springterror228:root@users.ye13s.mongodb.net/?retryWrites=true&w=majority&appName=Users"
+connection_string = os.getenv("MONGODB_CONNECTION_STRING")
 client = MongoClient(connection_string)
 db = client["Users"]
 collection = db["Users"]
@@ -43,7 +45,6 @@ def	checkListenTime():
 	while True:
 		allUsers: list[User] = list(collection.find())
 		for user in allUsers:
-			updatedUser = user.model_copy()
 			headers = {
 				'Authorization': f'Bearer {user.currentAccessToken}'
 			}
@@ -53,11 +54,13 @@ def	checkListenTime():
 			if response.status_code == 200:
 				data = response.json()
 				isPlaying = data.get('is_playing', None)
-				updatedUser.listenTime += time_ns() - updatedUser.lastCheckTime
-				updatedUser.lastCheckTime = time_ns()
 
 				if isPlaying is True:
-					collection.replace_one({"emailId": user.emailId}, updatedUser.model_dump())
+					updatedUser = user.model_dump()
+					updatedUser['listenTime'] += time_ns() - updatedUser['lastCheckTime']
+					updatedUser['lastCheckTime'] = time_ns()
+					collection.replace_one({"emailId": user.emailId}, updatedUser)
+
 		time.sleep(45)
 
 
