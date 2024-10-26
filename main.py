@@ -68,10 +68,16 @@ def refreshAccessToken(user: User):
     if response.status_code == 200:
         newTokenInfo = response.json()
         newAccessToken = newTokenInfo.get('access_token')
-        collection.update_one({"emailId": user.emailId}, {"$set": {"currentAccessToken": newAccessToken}})
+        newRefreshToken = newTokenInfo.get('refresh_token')
+        collection.update_one(
+            {"emailId": user.emailId},
+            {"$set": {"currentAccessToken": newAccessToken, "refreshToken": newRefreshToken}}
+        )
+
         logger.info(f"Access token refreshed for user: {user.emailId}")
     else:
         logger.error(f"Failed to refresh token for user: {user.emailId} with status code {response.status_code}")
+
 
 def checkListenTime():
     url = 'https://api.spotify.com/v1/me/player/currently-playing'
