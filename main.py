@@ -71,6 +71,7 @@ def	checkListenTime():
 	url = 'https://api.spotify.com/v1/me/player/currently-playing'
 
 	while True:
+		print("Yes working")
 		allUsers = collection.find()
 		for userFromCollection in allUsers:
 			user = User(**userFromCollection)
