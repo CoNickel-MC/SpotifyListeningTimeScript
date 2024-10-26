@@ -69,7 +69,7 @@ def refreshAccessToken(user: User):
     if response.status_code == 200:
         newTokenInfo = response.json()
         newAccessToken = newTokenInfo.get('access_token')
-        newRefreshToken = newTokenInfo.get('refresh_token')
+        newRefreshToken = newTokenInfo.get('refresh_token') or user.refreshToken
 
         collection.update_one(
             {"emailId": user.emailId},
