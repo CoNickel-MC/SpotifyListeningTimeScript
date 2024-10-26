@@ -55,6 +55,7 @@ async def addUser(newUser: User):
         logger.error(f"Error adding user {newUser.emailId}: {e}")
         raise HTTPException(status_code=500, detail="An error occurred while adding user.")
 
+
 def refreshAccessToken(user: User):
     url = 'https://accounts.spotify.com/api/token'
     payload = {
@@ -69,9 +70,13 @@ def refreshAccessToken(user: User):
         newTokenInfo = response.json()
         newAccessToken = newTokenInfo.get('access_token')
         newRefreshToken = newTokenInfo.get('refresh_token')
+
         collection.update_one(
             {"emailId": user.emailId},
-            {"$set": {"currentAccessToken": newAccessToken, "refreshToken": newRefreshToken}}
+            {"$set": {
+                "currentAccessToken": newAccessToken,
+                "refreshToken": newRefreshToken
+            }}
         )
 
         logger.info(f"Access token refreshed for user: {user.emailId}")
