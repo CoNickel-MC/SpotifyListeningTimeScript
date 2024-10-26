@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 
 
 
-
 load_dotenv()
 
 
@@ -72,8 +71,10 @@ def	checkListenTime():
 	url = 'https://api.spotify.com/v1/me/player/currently-playing'
 
 	while True:
-		allUsers: list[User] = list(collection.find())
-		for user in allUsers:
+		allUsers = collection.find()
+		for userFromCollection in allUsers:
+			user = User(**userFromCollection)
+
 			headers = {
 				'Authorization': f'Bearer {user.currentAccessToken}'
 			}
