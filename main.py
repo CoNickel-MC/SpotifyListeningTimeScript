@@ -8,96 +8,112 @@ from pymongo import MongoClient
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
+import logging
 
-
-
+# Load environment variables
 load_dotenv()
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-connection_string = os.getenv("MONGODB_CONNECTION_STRING")
-client = MongoClient(connection_string)
+# Connect to MongoDB
+connectionString = os.getenv("MONGODB_CONNECTION_STRING")
+client = MongoClient(connectionString)
 db = client["Users"]
 collection = db["Users"]
 
+# FastAPI app initialization
 app = FastAPI()
 
-
+# User model
 class User(BaseModel):
-	Name: str
-	emailId: str
-	currentAccessToken: str
-	refreshToken: str
-	listenTime: int
-	lastCheckTime: int
-
+    name: str
+    emailId: str
+    currentAccessToken: str
+    refreshToken: str
+    listenTime: int
+    lastCheckTime: int
 
 @app.get("/")
-async def read_root():
-	return {"message": "Welcome to the TuneStats API!"}
+async def readRoot():
+    return {"message": "Welcome to the TuneStats API!"}
 
 @app.head("/")
-async def read_root():
-	return {"message": "Welcome to the TuneStats API!"}
-
+async def readRootHead():
+    return {"message": "Welcome to the TuneStats API!"}
 
 @app.post("/addUser")
-async def addUser(newUser:User):
-	try:
-		if collection.find_one({"emailId": newUser.emailId}):
-			return
-		newUser.lastCheckTime = time_ns()
-		newUser.listenTime = 0
-		collection.insert_one(newUser.model_dump())
-	except Exception as e:
-		raise HTTPException(status_code=500, detail="An error occurred.")
+async def addUser(newUser: User):
+    try:
+        if collection.find_one({"emailId": newUser.emailId}):
+            return {"message": "User already exists"}
+        newUser.lastCheckTime = time_ns()
+        newUser.listenTime = 0
+        collection.insert_one(newUser.model_dump())
+    except Exception as e:
+        logger.error(f"Error adding user {newUser.emailId}: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while adding user.")
 
+def refreshAccessToken(user: User):
+    url = 'https://accounts.spotify.com/api/token'
+    payload = {
+        'grant_type': 'refresh_token',
+        'refresh_token': user.refreshToken,
+        'client_id': os.getenv("SPOTIFY_CLIENT_ID"),
+        'client_secret': os.getenv("SPOTIFY_CLIENT_SECRET")
+    }
 
-def refresh_access_token(user: User):
-	url = 'https://accounts.spotify.com/api/token'
-	payload = {
-		'grant_type': 'refresh_token',
-		'refresh_token': user.refreshToken,
-		'client_id': os.getenv("SPOTIFY_CLIENT_ID"),
-		'client_secret': os.getenv("SPOTIFY_CLIENT_SECRET")
-	}
+    response = requests.post(url, data=payload)
+    if response.status_code == 200:
+        newTokenInfo = response.json()
+        newAccessToken = newTokenInfo.get('access_token')
+        collection.update_one({"emailId": user.emailId}, {"$set": {"currentAccessToken": newAccessToken}})
+        logger.info(f"Access token refreshed for user: {user.emailId}")
+    else:
+        logger.error(f"Failed to refresh token for user: {user.emailId} with status code {response.status_code}")
 
-	response = requests.post(url, data=payload)
-	if response.status_code == 200:
-		new_token_info = response.json()
-		new_access_token = new_token_info.get('access_token')
-		collection.update_one({"emailId": user.emailId}, {"$set": {"currentAccessToken": new_access_token}})
+def checkListenTime():
+    url = 'https://api.spotify.com/v1/me/player/currently-playing'
 
-def	checkListenTime():
-	url = 'https://api.spotify.com/v1/me/player/currently-playing'
+    while True:
+        try:
+            allUsers = collection.find()
+            logger.info(f"Checking listen time for {collection.count_documents({})} users.")
+            for userFromCollection in allUsers:
+                try:
+                    user = User(**userFromCollection)
+                    headers = {
+                        'Authorization': f'Bearer {user.currentAccessToken}'
+                    }
 
-	while True:
-		print("Yes working")
-		allUsers = collection.find()
-		for userFromCollection in allUsers:
-			user = User(**userFromCollection)
+                    response = requests.get(url, headers=headers)
+                    logger.info(f"User {user.emailId}: Spotify API response {response.status_code}")
 
-			headers = {
-				'Authorization': f'Bearer {user.currentAccessToken}'
-			}
+                    if response.status_code == 401:
+                        logger.info(f"Token expired for user {user.emailId}, refreshing...")
+                        refreshAccessToken(user)
+                        headers['Authorization'] = f'Bearer {user.currentAccessToken}'
+                        response = requests.get(url, headers=headers)
 
-			response = requests.get(url, headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+                        isPlaying = data.get('is_playing', None)
 
-			if response.status_code == 401:
-				refresh_access_token(user)
-				headers['Authorization'] = f'Bearer {user.currentAccessToken}'
-				response = requests.get(url, headers=headers)
+                        if isPlaying is True:
+                            logger.info(f"User {user.emailId} is playing music, updating listen time.")
+                            updatedUser = user.model_dump()
+                            updatedUser['listenTime'] += time_ns() - updatedUser['lastCheckTime']
+                            updatedUser['lastCheckTime'] = time_ns()
+                            collection.replace_one({"emailId": user.emailId}, updatedUser)
 
-			if response.status_code == 200:
-				data = response.json()
-				isPlaying = data.get('is_playing', None)
+                except Exception as e:
+                    logger.error(f"Error processing user {userFromCollection.get('emailId')}: {e}")
 
-				if isPlaying is True:
-					updatedUser = user.model_dump()
-					updatedUser['listenTime'] += time_ns() - updatedUser['lastCheckTime']
-					updatedUser['lastCheckTime'] = time_ns()
-					collection.replace_one({"emailId": user.emailId}, updatedUser)
+            time.sleep(45)
 
-		time.sleep(45)
+        except Exception as mainLoopError:
+            logger.error(f"Error in main loop: {mainLoopError}")
 
-
+# Start the listening time check in a background thread
 threading.Thread(target=checkListenTime, daemon=True).start()
