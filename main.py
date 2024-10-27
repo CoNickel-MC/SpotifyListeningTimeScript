@@ -136,6 +136,6 @@ def checkListenTime():
             except Exception as e:
                 logger.error(f"Error processing user {userFromCollection.get('emailId')}: {e}")
 
-        time.sleep(45)
+        time.sleep(10)
 
 threading.Thread(target=checkListenTime, daemon=True).start()
