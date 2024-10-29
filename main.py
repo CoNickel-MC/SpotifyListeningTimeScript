@@ -85,7 +85,7 @@ def refreshAccessToken(user: User):
 
 
 def checkListenTime():
-    url = 'https://api.spotify.com/v1/me/player/currently-playing'
+    url = 'https://api.spotify.com/v1/me/player'
 
     while True:
         allUsers = collection.find()
@@ -136,6 +136,6 @@ def checkListenTime():
             except Exception as e:
                 logger.error(f"Error processing user {userFromCollection.get('emailId')}: {e}")
 
-        time.sleep(0.5)
+        time.sleep(12.5)
 
 threading.Thread(target=checkListenTime, daemon=True).start()
