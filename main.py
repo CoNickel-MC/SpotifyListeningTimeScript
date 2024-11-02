@@ -45,15 +45,15 @@ async def readRootHead():
 
 @app.post("/addUser")
 async def addUser(newUser: User):
-    logger.error(f"Adding {newUser.emailId}: {e}")
+    logger.error(f"Adding {newUser.emailId}")
     try:
         if collection.find_one({"emailId": newUser.emailId}):
-            logger.error(f"User Exists {newUser.emailId}: {e}")
+            logger.error(f"User Exists {newUser.emailId}")
             return {"message": "User already exists"}
         newUser.lastCheckTime = time_ns()
         newUser.listenTime = 0
         collection.insert_one(newUser.model_dump())
-        logger.error(f"Added {newUser.emailId} as a new user : {e}")
+        logger.error(f"Added {newUser.emailId} as a new user")
     except Exception as e:
         logger.error(f"Error adding user {newUser.emailId}: {e}")
         raise HTTPException(status_code=500, detail="An error occurred while adding user.")
